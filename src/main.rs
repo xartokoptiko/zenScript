@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::env;
+use std::time::Instant;
 use std::process;
 use evalexpr::{eval};
 use regex::Regex;
@@ -18,6 +19,7 @@ fn separate_zen_code(reader: BufReader<File>) {
     let mut labels = HashMap::new();
     let mut current_line = 0;
 
+    #[cfg(debug_assertions)]
     println!("Presenting the lines as vectors");
 
     // First loop: Print vectors for debugging and collect labels
@@ -26,6 +28,8 @@ fn separate_zen_code(reader: BufReader<File>) {
             .find_iter(line) // Use find_iter to capture entire matched groups
             .map(|m| m.as_str())
             .collect();
+
+        #[cfg(debug_assertions)]
         println!("Line {}: {:?}", line_number, tokens);
 
         // Check for labels
@@ -35,6 +39,7 @@ fn separate_zen_code(reader: BufReader<File>) {
         }
     }
 
+    #[cfg(debug_assertions)]
     println!("======Program start======");
 
     // Second loop: Compile each line
@@ -133,6 +138,8 @@ fn compile_zen_line(
 
 
 fn main() {
+    let start_time = Instant::now();
+
     // Get command line arguments as a vector
     let args: Vec<String> = env::args().collect();
 
@@ -168,4 +175,7 @@ fn main() {
 
     // Read line by line
     separate_zen_code(reader);
+
+    let duration = start_time.elapsed();
+    println!("\n\nExecution time: {:?}", duration);
 }
