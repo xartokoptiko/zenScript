@@ -72,16 +72,21 @@ fn compile_zen_line(
         "print" => {
             if line.len() > 1 {
                 let arg = line[1];
-                // Check if the argument is a string literal (starts and ends with quotes)
+
                 if arg.starts_with('"') && arg.ends_with('"') {
                     let string_literal = &arg[1..arg.len() - 1];
-                    println!("{}", string_literal);
+
+                    // Split on '\n' and print each segment with new lines
+                    for (i, segment) in string_literal.split("\\n").enumerate() {
+                        if i > 0 { println!(); } // Newline before each new segment except the first
+                        print!("{}", segment);
+                    }
                 }
-                // Check if the argument is a math expression enclosed in parentheses
+                // Handle math expression in parentheses as before
                 else if arg.starts_with('(') && arg.ends_with(')') && line.len() == 2 {
-                    let expression = &arg[1..arg.len() - 1]; // Strip parentheses
+                    let expression = &arg[1..arg.len() - 1];
                     match eval(expression) {
-                        Ok(result) => println!("{}", result),
+                        Ok(result) => print!("{}", result),
                         Err(err) => println!("ERROR: Could not evaluate expression '{}': {}", expression, err),
                     }
                 } else {

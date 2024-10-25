@@ -1,19 +1,20 @@
-print "Starting the Zen program..."
+print "Starting the Zen program...\n"
 
 // This is a comment !!!!!!
 print (2+3)
+print "\n"
 
 if (5>3) goto label1
-print "This line will be skipped."
+print "This line will be skipped.\n"
 
 
 label1:
-print "You have jumped to label 1!"
+print "You have jumped to label 1!\n"
 
 
 if (2<5) goto label2
-print "This line will also be skipped."
+print "This line will also be skipped.\n"
 
 
 label2:
-print "You have jumped to label 2!"
+print "You have jumped to label 2!\n"
