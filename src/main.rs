@@ -8,7 +8,7 @@ use evalexpr::{eval};
 use regex::Regex;
 
 fn separate_zen_code(reader: BufReader<File>) {
-    let lines: Vec<String> = reader.lines()
+    let mut lines: Vec<String> = reader.lines()
         .map(|line| line.unwrap())
         .filter(|line| !line.trim().is_empty()) // Filter out empty lines
         .collect();
@@ -18,6 +18,7 @@ fn separate_zen_code(reader: BufReader<File>) {
     // For label tracking
     let mut labels = HashMap::new();
     let mut current_line = 0;
+    let mut variables: HashMap<String, i64> = HashMap::new();
 
     #[cfg(debug_assertions)]
     println!("Presenting the lines as vectors");
@@ -44,14 +45,55 @@ fn separate_zen_code(reader: BufReader<File>) {
 
     // Second loop: Compile each line
     while current_line < lines.len() {
-        let line = &lines[current_line];
-        let tokens: Vec<&str> = re
-            .find_iter(line)
+        let original_line = &lines[current_line];
+        let mut modified_line = original_line.clone(); // Clone the original line for modification
+
+        // Check for variable references and replace them
+        let mut i = 0;
+        while i < modified_line.len() {
+            if modified_line.chars().nth(i) == Some('&') {
+                // Ensure there is a next character
+                if i + 1 < modified_line.len() {
+                    let next_char = modified_line.chars().nth(i + 1);
+                    // Check if the next character is not a space
+                    if next_char != Some(' ') {
+                        // Extract variable name
+                        let mut var_name = String::new();
+                        let mut j = i + 1;
+
+                        // Collect the variable name until we hit a non-alphanumeric character
+                        while j < modified_line.len() &&
+                            (modified_line.chars().nth(j).unwrap().is_alphanumeric() || modified_line.chars().nth(j).unwrap() == '_') {
+                            var_name.push(modified_line.chars().nth(j).unwrap());
+                            j += 1;
+                        }
+
+                        // Check if the variable exists and replace "&<variable>" with its value
+                        if let Some(value) = variables.get(&var_name) {
+
+                            // Replace both &<variable> with its value
+                            modified_line.replace_range(i..j, &value.to_string());
+                        } else {
+                            println!("ERROR: Variable '{}' is not initialized", var_name);
+                            current_line += 1; // Skip to the next line
+                            break; // Exit the loop since we need to continue
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        // Update the original line to be the modified line for further processing
+        lines[current_line] = modified_line;
+
+        // If a command is found, compile it using the modified line
+        let modified_tokens: Vec<&str> = re
+            .find_iter(&lines[current_line])
             .map(|m| m.as_str())
             .collect();
 
-        // If a command is found, compile it
-        if compile_zen_line(tokens, &labels, &mut current_line) {
+        if compile_zen_line(modified_tokens, &labels, &mut current_line, &mut variables) {
             continue; // If a jump occurred, skip to the next iteration
         }
 
@@ -62,13 +104,30 @@ fn separate_zen_code(reader: BufReader<File>) {
 fn compile_zen_line(
     line: Vec<&str>,
     labels: &HashMap<String, usize>,
-    current_line: &mut usize
+    current_line: &mut usize,
+    variables: &mut HashMap<String, i64>
 ) -> bool {
     if line.is_empty() {
         return false; // Skip empty lines
     }
 
     match line[0] {
+        "&" => {
+            if line.len() >= 4 && line[2] == "=" {
+                let var_name = line[1];
+                if let Ok(value) = line[3].parse::<i64>() {
+                    #[cfg(debug_assertions)]
+                    println!("[INFO] VARIABLE INITIALIZED: {} {}", var_name.to_string() ,value);
+
+                    variables.insert(var_name.to_string(), value);
+                } else {
+                    println!("ERROR: Invalid value for variable '{}'", var_name);
+                }
+                return false;
+            } else {
+                println!("ERROR: Invalid variable declaration syntax");
+            }
+        },
         "print" => {
             if line.len() > 1 {
                 let arg = line[1];
@@ -144,20 +203,14 @@ fn compile_zen_line(
 
 fn main() {
     let start_time = Instant::now();
-
-    // Get command line arguments as a vector
     let args: Vec<String> = env::args().collect();
 
-    // Check if a file argument was provided
     if args.len() != 2 {
         eprintln!("Usage: zen <filename>");
         process::exit(1);
     }
 
-    // Get the file path from arguments
     let file_path = &args[1];
-
-    // Convert the path to an absolute path relative to current directory
     let absolute_path = match std::fs::canonicalize(file_path) {
         Ok(path) => path,
         Err(e) => {
@@ -166,7 +219,6 @@ fn main() {
         }
     };
 
-    // Open the file
     let file = match File::open(&absolute_path) {
         Ok(file) => file,
         Err(e) => {
@@ -175,10 +227,7 @@ fn main() {
         }
     };
 
-    // Create a buffered reader
     let reader = BufReader::new(file);
-
-    // Read line by line
     separate_zen_code(reader);
 
     let duration = start_time.elapsed();

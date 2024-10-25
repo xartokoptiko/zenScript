@@ -4,9 +4,16 @@ print "Starting the Zen program...\n"
 print (2+3)
 print "\n"
 
-if (5>3) goto label1
-print "This line will be skipped.\n"
+// Initializing  a variable
+& x = 10
 
+print "This integer is initialized as x -> "
+print "&x"
+
+print "\n"
+
+if (&x>3) goto label1
+print "This line will be skipped.\n"
 
 label1:
 print "You have jumped to label 1!\n"
@@ -18,3 +25,4 @@ print "This line will also be skipped.\n"
 
 label2:
 print "You have jumped to label 2!\n"
+
