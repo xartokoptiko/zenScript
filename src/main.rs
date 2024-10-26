@@ -4,10 +4,11 @@ use std::io::{BufRead, BufReader};
 use std::env;
 use std::time::Instant;
 use std::process;
-use evalexpr::{eval};
+use evalexpr::{eval, Value};
 use regex::Regex;
+use colored::Colorize;
 
-fn separate_zen_code(reader: BufReader<File>) {
+fn separate_zen_code(reader: BufReader<File>, mut zen_args: Vec<i64>) {
     let mut lines: Vec<String> = reader.lines()
         .map(|line| line.unwrap())
         .filter(|line| !line.trim().is_empty()) // Filter out empty lines
@@ -21,7 +22,7 @@ fn separate_zen_code(reader: BufReader<File>) {
     let mut variables: HashMap<String, i64> = HashMap::new();
 
     #[cfg(debug_assertions)]
-    println!("Presenting the lines as vectors");
+    println!("{}", "\n\n====Presenting the lines as vectors====\n\n".cyan());
 
     // First loop: Print vectors for debugging and collect labels
     for (line_number, line) in lines.iter().enumerate() {
@@ -31,7 +32,7 @@ fn separate_zen_code(reader: BufReader<File>) {
             .collect();
 
         #[cfg(debug_assertions)]
-        println!("Line {}: {:?}", line_number, tokens);
+        println!("{} {} {:?}", "Line".yellow(), line_number.to_string().yellow(), tokens);
 
         // Check for labels
         if tokens.len() > 0 && tokens[0].ends_with(':') {
@@ -41,10 +42,17 @@ fn separate_zen_code(reader: BufReader<File>) {
     }
 
     #[cfg(debug_assertions)]
-    println!("======Program start======");
+    println!("{} {:?}", "Labels found:".yellow(), labels);
+
+    #[cfg(debug_assertions)]
+    println!("{}", "\n\n======Program start======\n\n".cyan());
 
     // Second loop: Compile each line
     while current_line < lines.len() {
+
+        #[cfg(debug_assertions)]
+        println!("{} {} : {}", "Executing line".yellow(), current_line.to_string().yellow(), lines[current_line].to_string().yellow());
+
         let original_line = &lines[current_line];
         let mut modified_line = original_line.clone(); // Clone the original line for modification
 
@@ -74,7 +82,7 @@ fn separate_zen_code(reader: BufReader<File>) {
                             // Replace both &<variable> with its value
                             modified_line.replace_range(i..j, &value.to_string());
                         } else {
-                            println!("ERROR: Variable '{}' is not initialized", var_name);
+                            println!("{} '{}' ", "ERROR: Variable is not initialized".red(), var_name.red());
                             current_line += 1; // Skip to the next line
                             break; // Exit the loop since we need to continue
                         }
@@ -85,7 +93,7 @@ fn separate_zen_code(reader: BufReader<File>) {
         }
 
         // Update the original line to be the modified line for further processing
-        lines[current_line] = modified_line;
+        lines[current_line] = modified_line.clone();
 
         // If a command is found, compile it using the modified line
         let modified_tokens: Vec<&str> = re
@@ -93,11 +101,13 @@ fn separate_zen_code(reader: BufReader<File>) {
             .map(|m| m.as_str())
             .collect();
 
-        if compile_zen_line(modified_tokens, &labels, &mut current_line, &mut variables) {
-            continue; // If a jump occurred, skip to the next iteration
-        }
+        if compile_zen_line(modified_tokens, &labels, &mut current_line, &mut variables, &mut zen_args) {
+            #[cfg(debug_assertions)]
+            println!("{} {}", "Jump occurred! New line: ".yellow(), current_line.to_string().yellow());
 
-        current_line += 1; // Move to the next line
+            continue;  // Skip the increment if we jumped
+        }
+        current_line += 1;
     }
 }
 
@@ -105,7 +115,8 @@ fn compile_zen_line(
     line: Vec<&str>,
     labels: &HashMap<String, usize>,
     current_line: &mut usize,
-    variables: &mut HashMap<String, i64>
+    variables: &mut HashMap<String, i64>,
+    zen_args : &mut Vec<i64>
 ) -> bool {
     if line.is_empty() {
         return false; // Skip empty lines
@@ -114,18 +125,40 @@ fn compile_zen_line(
     match line[0] {
         "&" => {
             if line.len() >= 4 && line[2] == "=" {
-                let var_name = line[1];
-                if let Ok(value) = line[3].parse::<i64>() {
-                    #[cfg(debug_assertions)]
-                    println!("[INFO] VARIABLE INITIALIZED: {} {}", var_name.to_string() ,value);
+                let var_name = line[1].to_string();
+                let value_str = line[3];
 
-                    variables.insert(var_name.to_string(), value);
+                let new_value = if value_str.starts_with('!') {
+                    let arg_index = value_str[1..].parse::<usize>().unwrap_or(0) - 1;
+                    if arg_index < zen_args.len() {
+                        Value::Int(zen_args[arg_index]) // Wrap in Value::Int
+                    } else {
+                        println!("{} '{}' ", "ERROR: Argument index out of bounds".red(), arg_index + 1);
+                        return false;
+                    }
+                } else if value_str.starts_with('(') && value_str.ends_with(')') {
+                    let expression = &value_str[1..value_str.len() - 1];
+                    eval(expression).unwrap_or(Value::Int(0)) // Eval result as Value::Int
+                } else if let Ok(value) = value_str.parse::<i64>() {
+                    Value::Int(value) // Wrap in Value::Int for direct numbers
                 } else {
-                    println!("ERROR: Invalid value for variable '{}'", var_name);
-                }
+                    println!("{} '{}'", "ERROR: Invalid value for variable ".red(), var_name.to_string().red());
+                    return false;
+                };
+
+                // Convert new_value to i64 if it’s an Int, or handle error if it's not
+                let new_value_i64 = match new_value {
+                    Value::Int(val) => val,
+                    _ => {
+                        println!("{} '{}'", "ERROR: Unsupported value type".red(), var_name.to_string().red());
+                        return false;
+                    }
+                };
+
+                variables.insert(var_name.clone(), new_value_i64);
                 return false;
             } else {
-                println!("ERROR: Invalid variable declaration syntax");
+                println!("{}", "ERROR: Invalid variable declaration syntax".red());
             }
         },
         "print" => {
@@ -146,10 +179,10 @@ fn compile_zen_line(
                     let expression = &arg[1..arg.len() - 1];
                     match eval(expression) {
                         Ok(result) => print!("{}", result),
-                        Err(err) => println!("ERROR: Could not evaluate expression '{}': {}", expression, err),
+                        Err(err) => println!("{} '{}' : {}", "ERROR: Could not evaluate expression".red(), expression, err),
                     }
                 } else {
-                    println!("ERROR: Could not parse argument '{}'", arg);
+                    println!("{} '{}'", "ERROR: Could not parse argument".red(), arg);
                 }
             }
         },
@@ -166,22 +199,39 @@ fn compile_zen_line(
                                     if line.len() > 3 && line[2] == "goto" {
                                         let label = line[3].trim_start_matches(':');
                                         if let Some(&line_num) = labels.get(label) {
-                                            *current_line = line_num+1; // Jump to label line
+                                            *current_line = line_num + 1; // Jump to label line
                                             return true; // Indicate jump occurred
                                         } else {
-                                            println!("ERROR: Label '{}' not found", label);
+                                            println!("{} {}", "ERROR: Label '{}' not found".red(), label);
                                         }
                                     }
                                 }
                             } else {
-                                println!("ERROR: Expected a boolean value from condition evaluation.");
+                                println!("{}", "ERROR: Expected a boolean value from condition evaluation.".red());
                             }
                         }
-                        Err(err) => println!("ERROR: Could not evaluate condition '{}': {}", condition_str, err),
+                        Err(err) => println!("{} {} {}", "ERROR: Could not evaluate condition ".red(), condition_str, err),
                     }
                 } else {
-                    println!("ERROR: Could not parse condition '{}'", condition);
+                    println!("{} {}", "ERROR: Could not parse condition ".red(), condition);
                 }
+            }
+        },
+        "goto" => {
+            let label = line[1].trim_start_matches(':');
+
+            #[cfg(debug_assertions)]
+            println!("{} {} {} {:?}", "Attempting to goto label : ".yellow() , label , "Known labels: ".yellow() , labels);
+
+            if let Some(&line_num) = labels.get(label) {
+
+                #[cfg(debug_assertions)]
+                println!("{} {} {} {}", "Jumping from line -> ".yellow() , current_line ," to line -> ".yellow() , line_num);
+
+                *current_line = line_num + 1; // Keep the +1 to move to line after label
+                return true;
+            } else {
+                println!("{} '{}' {}", "ERROR: Label : ".red(),  label ," not found".red());
             }
         },
         "//" => {
@@ -189,10 +239,10 @@ fn compile_zen_line(
         },
         label if label.ends_with(':') => {
             // If it's a label, just return true and continue to the next iteration
-            return true;
+            return false;
         }
         _ => {
-            println!("ERROR: No command found or invalid label");
+            println!("{}", "ERROR: No command found or invalid label".red());
         }
     }
 
@@ -205,12 +255,17 @@ fn main() {
     let start_time = Instant::now();
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 2 {
-        eprintln!("Usage: zen <filename>");
+    if args.len() < 2 {
+        eprintln!("{}", "Usage: zen <filename> [args]".red());
         process::exit(1);
     }
 
     let file_path = &args[1];
+    let zen_args: Vec<i64> = args[2..].iter()
+        .map(|arg| arg.parse::<i64>().unwrap_or(0))
+        .collect();
+
+
     let absolute_path = match std::fs::canonicalize(file_path) {
         Ok(path) => path,
         Err(e) => {
@@ -228,7 +283,7 @@ fn main() {
     };
 
     let reader = BufReader::new(file);
-    separate_zen_code(reader);
+    separate_zen_code(reader, zen_args);
 
     let duration = start_time.elapsed();
     println!("\n\nExecution time: {:?}", duration);
