@@ -1,0 +1,17 @@
+// CURRENTLY NOT JUMPING TO LABELS BEFORE THE EXECUTING LINE WILL
+// RESULT IN INFINITE LOOP. NEEDS TO BE FIXED
+
+& c = 1
+
+loop_start:
+print "Counter value is: "
+print "&c \n"
+
+if (&c>10) goto end_loop
+
+& c = (&c+1)
+goto loop_start
+
+end_loop:
+print "Loop finished! Final counter value is: "
+print "&c \n"

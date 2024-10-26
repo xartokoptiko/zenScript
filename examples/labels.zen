@@ -1,0 +1,28 @@
+// AN EXAMPLE ON HOW TO USE LABELS TO JUMP OVER A CODE SNIPPET
+
+print "Starting my first ZenASM program \n"
+
+& x = (1+9)
+print "User's age is : "
+print "&x \n"
+
+label4:
+print "Here \n"
+
+if (&x>17) goto label1
+print "user is less than 17 \n"
+goto label2
+print "This line should not appear no matter the outcome of x>17 \n"
+
+label1:
+print "User is older than 17 \n"
+
+label2:
+print "Program can continue from here \n"
+& x = (&x+1)
+
+print "New value of x is -> "
+print "&x \n"
+
+// label4:
+print "Key bye! \n"

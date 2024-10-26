@@ -1,0 +1,47 @@
+// THIS IS A BASIC CALCULATOR THAT TAKES USER INPUT FROM ARGS
+// EXAMPLE USE :
+// terminal@user &>zen calc.zen [type of operation 0-1-2-3] [first number] [second number]
+// terminal@user &>zen calc.zen 0 3 4 (This will add 4 and 3)
+
+print "This is a basic calculator in the zenASM scripting language \n"
+
+// t -> Type , The type of our operation.... 0 -> (+) , 1 -> (-) , 2 -> (*) , 3 -> (/)
+& t = 0
+
+// f -> First number !
+& f = 1
+
+// s -> Second Number !
+& s = 4
+
+& r = 0
+
+// Redirecting to the chosen mathematical operation label
+
+if (&t==0) goto addition
+if (&t==1) goto subtraction
+if (&t==2) goto multiply
+if (&t==3) goto division
+
+// Labels for the mathematical operations
+
+addition:
+& r = (&f+&s)
+goto result
+
+subtraction:
+& r = (&f-&s)
+goto result
+
+multiply:
+& r = (&f*&s)
+goto result
+
+division:
+& r = (&f/&s)
+goto result
+
+// Result label
+
+result:
+print "The result is -> &r \n"

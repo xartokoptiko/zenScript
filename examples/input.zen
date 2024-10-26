@@ -1,0 +1,14 @@
+// AN EXAMPLE ON HOW TO TAKE USER INPUT FROM THE TERMINAL ARGS
+// terminal@user &>zen input.zen 4 5 8
+
+
+
+print "Handling simple user input \n"
+
+& x = !1
+& r = !2
+& f = !3
+
+print "&x \n"
+print "&r \n"
+print "&f \n"

@@ -1,0 +1,8 @@
+Package: zen
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.29)
+Maintainer: Lampros Karachristos <lamproskarachristos@yahoo.com>
+Description: Zen ASM Interpreter. A simple interpreter for Zen scripts, designed as an educational tool.
