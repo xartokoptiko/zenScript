@@ -6,13 +6,13 @@
 print "This is a basic calculator in the zenASM scripting language \n"
 
 // t -> Type , The type of our operation.... 0 -> (+) , 1 -> (-) , 2 -> (*) , 3 -> (/)
-& t = 0
+& t = !1
 
 // f -> First number !
-& f = 1
+& f = !2
 
 // s -> Second Number !
-& s = 4
+& s = !3
 
 & r = 0
 
